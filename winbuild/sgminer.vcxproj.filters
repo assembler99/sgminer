@@ -128,6 +128,12 @@
     <ClCompile Include="..\sph\skein.c">
       <Filter>Source Files\sph</Filter>
     </ClCompile>
+    <ClCompile Include="..\sph\whirlpool.c">
+      <Filter>Source Files\sph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sph\shabal.c">
+      <Filter>Source Files\sph</Filter>
+    </ClCompile>
     <ClCompile Include="..\ocl\binary_kernel.c">
       <Filter>Source Files\ocl</Filter>
     </ClCompile>
@@ -179,6 +185,9 @@
     <ClCompile Include="..\config_parser.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\events.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\algorithm\talkcoin.c">
       <Filter>Source Files\algorithm</Filter>
     </ClCompile>
@@ -188,11 +197,11 @@
     <ClCompile Include="..\algorithm\x14.c">
       <Filter>Source Files\algorithm</Filter>
     </ClCompile>
-    <ClCompile Include="..\sph\whirlpool.c">
-      <Filter>Source Files\sph</Filter>
+    <ClCompile Include="..\algorithm\fresh.c">
+      <Filter>Source Files\algorithm</Filter>
     </ClCompile>
-    <ClCompile Include="..\sph\shabal.c">
-      <Filter>Source Files\sph</Filter>
+    <ClCompile Include="..\algorithm\whirlcoin.c">
+      <Filter>Source Files\algorithm</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -298,6 +307,12 @@
     <ClInclude Include="..\sph\sph_blake.h">
       <Filter>Header Files\sph</Filter>
     </ClInclude>
+    <ClInclude Include="..\sph\sph_whirlpool.h">
+      <Filter>Header Files\sph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sph\sph_shabal.h">
+      <Filter>Header Files\sph</Filter>
+    </ClInclude>
     <ClInclude Include="..\ocl\binary_kernel.h">
       <Filter>Header Files\ocl</Filter>
     </ClInclude>
@@ -352,6 +367,9 @@
     <ClInclude Include="..\config_parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\events.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\algorithm\talkcoin.h">
       <Filter>Header Files\algorithm</Filter>
     </ClInclude>
@@ -361,11 +379,11 @@
     <ClInclude Include="..\algorithm\x14.h">
       <Filter>Header Files\algorithm</Filter>
     </ClInclude>
-    <ClInclude Include="..\sph\sph_whirlpool.h">
-      <Filter>Header Files\sph</Filter>
+    <ClInclude Include="..\algorithm\fresh.h">
+      <Filter>Header Files\algorithm</Filter>
     </ClInclude>
-    <ClInclude Include="..\sph\sph_shabal.h">
-      <Filter>Header Files\sph</Filter>
+    <ClInclude Include="..\algorithm\whirlcoin.h">
+      <Filter>Header Files\algorithm</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

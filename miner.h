@@ -266,6 +266,11 @@ DRIVER_PARSE_COMMANDS(DRIVER_PROTOTYPE)
   #define strtobool(str) ((str && (!strcasecmp(str, "true") || !strcasecmp(str, "yes") || !strcasecmp(str, "1")))?true:false)
 #endif
 
+extern int opt_remoteconf_retry;
+extern int opt_remoteconf_wait;
+extern bool opt_remoteconf_usecache;
+
+
 enum alive {
   LIFE_WELL,
   LIFE_SICK,
@@ -1047,6 +1052,11 @@ extern bool opt_worktime;
 extern int swork_id;
 extern int opt_tcp_keepalive;
 extern bool opt_incognito;
+
+// Xn Algorithm options
+extern int opt_keccak_unroll;
+extern bool opt_blake_compact;
+extern bool opt_luffa_parallel;
 extern int opt_hamsi_expand_big;
 extern bool opt_hamsi_short;
 

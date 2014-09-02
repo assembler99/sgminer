@@ -59,6 +59,7 @@ char *curly = ":D";
 #include "algorithm.h"
 #include "pool.h"
 #include "config_parser.h"
+#include "events.h"
 
 #if defined(unix) || defined(__APPLE__)
   #include <errno.h>
@@ -88,6 +89,11 @@ bool opt_loginput;
 bool opt_compact;
 bool opt_incognito;
 
+// remote config options...
+int opt_remoteconf_retry = 3; // number of retries
+int opt_remoteconf_wait = 10; // wait in secs between retries
+bool opt_remoteconf_usecache = false; // use last downloaded copy of the config file when download fails
+
 const int opt_cutofftemp = 95;
 int opt_log_interval = 5;
 int opt_queue = 1;
@@ -102,9 +108,16 @@ time_t last_getwork;
 int nDevs;
 int opt_dynamic_interval = 7;
 int opt_g_threads = -1;
-int opt_hamsi_expand_big = 4;
-bool opt_hamsi_short = false;
 bool opt_restart = true;
+
+/*****************************************
+ * Xn Algorithm options
+ *****************************************/
+int opt_hamsi_expand_big = 4;
+int opt_keccak_unroll = 0;
+bool opt_hamsi_short = false;
+bool opt_blake_compact = false;
+bool opt_luffa_parallel = false;
 
 struct list_head scan_devices;
 bool devices_enabled[MAX_DEVICES];
@@ -1327,6 +1340,9 @@ struct opt_table opt_config_table[] = {
   OPT_WITHOUT_ARG("--balance",
       set_balance, &pool_strategy,
       "Change multipool strategy from failover to even share balance"),
+  OPT_WITHOUT_ARG("--blake-compact",
+      opt_set_bool, &opt_blake_compact,
+      "Set SPH_COMPACT_BLAKE64 for Xn derived algorithms (Can give better hashrate for some GPUs)"),
 #ifdef HAVE_CURSES
   OPT_WITHOUT_ARG("--compact",
       opt_set_bool, &opt_compact,
@@ -1353,6 +1369,27 @@ struct opt_table opt_config_table[] = {
   OPT_WITH_ARG("--expiry|-E",
       set_int_0_to_9999, opt_show_intval, &opt_expiry,
       "Upper bound on how many seconds after getting work we consider a share from it stale"),
+
+  // event options
+  OPT_WITH_ARG("--event-on",
+      set_event_type, NULL, NULL,
+      "Select event type to perform task on"),
+  OPT_WITH_ARG("--event-runcmd",
+      set_event_runcmd, NULL, NULL,
+      "Command to perform on event"),
+  OPT_WITH_ARG("--event-reboot",
+      set_event_reboot, NULL, NULL,
+      "Reboot the system on event"),
+  OPT_WITH_ARG("--event-reboot-delay",
+      set_event_reboot_delay, NULL, NULL,
+      "Delay in seconds to wait before rebooting"),
+  OPT_WITH_ARG("--event-quit",
+      set_event_quit, NULL, NULL,
+      "Quit sgminer on event"),
+  OPT_WITH_ARG("--event-quit-message",
+      set_event_quit_message, NULL, NULL,
+      "Quit message when quitting sgminer on event"),
+
   OPT_WITHOUT_ARG("--failover-only",
       opt_set_bool, &opt_fail_only,
       "Don't leak work to backup pools when primary pool is lagging"),
@@ -1402,15 +1439,21 @@ struct opt_table opt_config_table[] = {
       set_default_gpu_vddc, NULL, NULL,
       "Set the GPU voltage in Volts - one value for all or separate by commas for per card"),
 #endif
-  OPT_WITH_ARG("--lookup-gap",
-      set_default_lookup_gap, NULL, NULL,
-      "Set GPU lookup gap for scrypt mining, comma separated"),
   OPT_WITH_ARG("--hamsi-expand-big",
       set_int_1_to_10, opt_show_intval, &opt_hamsi_expand_big,
       "Set SPH_HAMSI_EXPAND_BIG for X13 derived algorithms (1 or 4 are common)"),
   OPT_WITHOUT_ARG("--hamsi-short",
       opt_set_bool, &opt_hamsi_short,
       "Set SPH_HAMSI_SHORT for X13 derived algorithms (Can give better hashrate for some GPUs)"),
+  OPT_WITH_ARG("--keccak-unroll",
+      set_int_0_to_9999, opt_show_intval, &opt_keccak_unroll,
+      "Set SPH_KECCAK_UNROLL for Xn derived algorithms (Default: 0)"),
+  OPT_WITH_ARG("--lookup-gap",
+      set_default_lookup_gap, NULL, NULL,
+      "Set GPU lookup gap for scrypt mining, comma separated"),
+  OPT_WITHOUT_ARG("--luffa-parallel",
+      opt_set_bool, &opt_luffa_parallel,
+      "Set SPH_LUFFA_PARALLEL for Xn derived algorithms (Can give better hashrate for some GPUs)"),
 #ifdef HAVE_CURSES
   OPT_WITHOUT_ARG("--incognito",
       opt_set_bool, &opt_incognito,
@@ -1740,6 +1783,10 @@ struct opt_table opt_config_table[] = {
       opt_set_bool, NULL, NULL, opt_hidden),
   OPT_WITH_ARG("--profiles",
       opt_set_bool, NULL, NULL, opt_hidden),
+  OPT_WITH_ARG("--includes",
+      opt_set_bool, NULL, NULL, opt_hidden),
+  OPT_WITH_ARG("--events",
+      opt_set_bool, NULL, NULL, opt_hidden),
   OPT_WITH_ARG("--difficulty-multiplier",
       set_difficulty_multiplier, NULL, NULL,
       "(deprecated) Difficulty multiplier for jobs received from stratum pools"),
@@ -1775,6 +1822,15 @@ static struct opt_table opt_cmdline_table[] = {
       set_default_config, NULL, NULL,
       "Specify the filename of the default config file\n"
       "Loaded at start and used when saving without a name."),
+  OPT_WITH_ARG("--remote-config-retry",
+      set_int_0_to_9999, opt_show_intval, &opt_remoteconf_retry,
+      "Number of times to retry downloading remote config file. Default: 3"),
+  OPT_WITH_ARG("--remote-config-wait",
+      set_int_0_to_9999, opt_show_intval, &opt_remoteconf_wait,
+      "Time in seconds to wait between download retries of remote config files. Default: 10secs"),
+  OPT_WITHOUT_ARG("--remote-config-usecache",
+      opt_set_bool, &opt_remoteconf_usecache,
+      "Use cached copy of the remote config file when download fails. Default: No"),
   OPT_WITHOUT_ARG("--help|-h",
       opt_verusage_and_exit, NULL,
       "Print this message"),
@@ -1798,7 +1854,8 @@ static bool jobj_binary(const json_t *obj, const char *key,
   tmp = json_object_get(obj, key);
   if (unlikely(!tmp)) {
     if (unlikely(required))
-      applog(LOG_ERR, "JSON key '%s' not found", key);
+      if (opt_morenotices)
+        applog(LOG_ERR, "JSON key '%s' not found", key);
     return false;
   }
   hexstr = json_string_value(tmp);
@@ -2150,18 +2207,21 @@ static bool gbt_decode(struct pool *pool, json_t *res_val)
 static bool getwork_decode(json_t *res_val, struct work *work)
 {
   if (unlikely(!jobj_binary(res_val, "data", work->data, sizeof(work->data), true))) {
-    applog(LOG_ERR, "%s: JSON inval data", isnull(get_pool_name(work->pool), ""));
+    if (opt_morenotices)
+      applog(LOG_ERR, "%s: JSON inval data", isnull(get_pool_name(work->pool), ""));
     return false;
   }
 
   if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
     // Calculate it ourselves
-    applog(LOG_DEBUG, "%s: Calculating midstate locally", isnull(get_pool_name(work->pool), ""));
+    if (opt_morenotices)
+      applog(LOG_DEBUG, "%s: Calculating midstate locally", isnull(get_pool_name(work->pool), ""));
     calc_midstate(work);
   }
 
   if (unlikely(!jobj_binary(res_val, "target", work->target, sizeof(work->target), true))) {
-    applog(LOG_ERR, "%s: JSON inval target", isnull(get_pool_name(work->pool), ""));
+    if (opt_morenotices)
+      applog(LOG_ERR, "%s: JSON inval target", isnull(get_pool_name(work->pool), ""));
     return false;
   }
   return true;
@@ -5761,6 +5821,7 @@ static struct work *hash_pop(bool blocking)
       if (rc && !no_work) {
         no_work = true;
         applog(LOG_WARNING, "Waiting for work to be available from pools.");
+        event_notify("idle");
       }
     } while (!HASH_COUNT(staged_work));
   }
@@ -6844,6 +6905,7 @@ static void hash_sole_work(struct thr_info *mythr)
         applog(LOG_ERR, "%s %d failure, disabling!", drv->name, cgpu->device_id);
         cgpu->deven = DEV_DISABLED;
         dev_error(cgpu, REASON_THREAD_ZERO_HASH);
+        event_notify("idle");
         cgpu->shutdown = true;
         break;
       }
@@ -7302,7 +7364,8 @@ static void *watchdog_thread(void __maybe_unused *userdata)
   memset(&zero_tv, 0, sizeof(struct timeval));
   cgtime(&rotate_tv);
 
-  while (1) {
+  while (1)
+  {
     int i;
     struct timeval now;
 
@@ -7340,6 +7403,10 @@ static void *watchdog_thread(void __maybe_unused *userdata)
 #endif
 
     cgtime(&now);
+
+    // check last getwork time if greater than 10 mins, declare idle...
+    if ((time(NULL) - last_getwork) >= 600)
+      event_notify("idle");
 
     if (!sched_paused && !should_run()) {
       applog(LOG_WARNING, "Pausing execution as per stop time %02d:%02d scheduled",
@@ -7419,6 +7486,7 @@ static void *watchdog_thread(void __maybe_unused *userdata)
         cgtime(&thr->sick);
 
         dev_error(cgpu, REASON_DEV_SICK_IDLE_60);
+        event_notify("gpu_sick");
 #ifdef HAVE_ADL
         if (adl_active && cgpu->has_adl && gpu_activity(gpu) > 50) {
           applog(LOG_ERR, "GPU still showing activity suggesting a hard hang.");
@@ -7435,6 +7503,7 @@ static void *watchdog_thread(void __maybe_unused *userdata)
         cgtime(&thr->sick);
 
         dev_error(cgpu, REASON_DEV_DEAD_IDLE_600);
+        event_notify("gpu_dead");
       } else if (now.tv_sec - thr->sick.tv_sec > 60 &&
            (cgpu->status == LIFE_SICK || cgpu->status == LIFE_DEAD)) {
         /* Attempt to restart a GPU that's sick or dead once every minute */
