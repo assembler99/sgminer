@@ -669,6 +669,8 @@ static algorithm_settings_t algos[] = {
   A_FUGUE( "groestlcoin", groestlcoin_regenhash),
 #undef A_FUGUE
 
+// Diamond uses the same hashing as GroestlCoin, but the traditional sha256d for transactions
+  { "diamond", ALGO_FUGUE, 1, 256, 256, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, groestlcoin_regenhash, queue_sph_kernel, gen_hash, NULL},
   { "whirlcoin", ALGO_WHIRL, 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 3, 8 * 16 * 4194304, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, whirlcoin_regenhash, queue_whirlcoin_kernel, sha256, NULL},
 
   // Terminator (do not remove)
