@@ -621,6 +621,7 @@ static algorithm_settings_t algos[] = {
   A_SCRYPT( "ckolivas" ),
   A_SCRYPT( "alexkarnew" ),
   A_SCRYPT( "alexkarnold" ),
+  A_SCRYPT( "arebyp" ),
   A_SCRYPT( "bufius" ),
   A_SCRYPT( "psw" ),
   A_SCRYPT( "zuikkis" ),
