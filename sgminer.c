@@ -67,7 +67,7 @@ char *curly = ":D";
   #include <sys/wait.h>
 #endif
 
-#ifdef GIT_VERSION
+#ifdef USE_GIT_VERSION
 #undef VERSION
 #define VERSION GIT_VERSION
 #endif
@@ -538,6 +538,11 @@ struct pool *add_pool(void)
   pool->profile = strdup(buf);	//profile blank by default
   pool->algorithm.name[0] = '\0'; //blank algorithm name
 
+  /* intensities default to blank */
+  pool->intensity = strdup(buf);
+  pool->xintensity = strdup(buf);
+  pool->rawintensity = strdup(buf);
+
   pools = (struct pool **)realloc(pools, sizeof(struct pool *) * (total_pools + 2));
   pools[total_pools++] = pool;
   mutex_init(&pool->pool_lock);
@@ -803,6 +808,16 @@ static char *set_pool_devices(const char *arg)
   return NULL;
 }
 
+static char *set_pool_kernelfile(const char *arg)
+{
+  struct pool *pool = get_current_pool();
+
+  applog(LOG_DEBUG, "Setting pool %i algorithm kernel file to %s", pool->pool_no, arg);
+  pool->algorithm.kernelfile = arg;
+
+  return NULL;
+}
+
 static char *set_pool_lookup_gap(const char *arg)
 {
   struct pool *pool = get_current_pool();
@@ -813,21 +828,21 @@ static char *set_pool_lookup_gap(const char *arg)
 static char *set_pool_intensity(const char *arg)
 {
   struct pool *pool = get_current_pool();
-  pool->intensity = arg;
+  opt_set_charp(arg, &pool->intensity);
   return NULL;
 }
 
 static char *set_pool_xintensity(const char *arg)
 {
   struct pool *pool = get_current_pool();
-  pool->xintensity = arg;
+  opt_set_charp(arg, &pool->xintensity);
   return NULL;
 }
 
 static char *set_pool_rawintensity(const char *arg)
 {
   struct pool *pool = get_current_pool();
-  pool->rawintensity = arg;
+  opt_set_charp(arg, &pool->rawintensity);
   return NULL;
 }
 
@@ -1448,7 +1463,10 @@ struct opt_table opt_config_table[] = {
   OPT_WITH_ARG("--keccak-unroll",
       set_int_0_to_9999, opt_show_intval, &opt_keccak_unroll,
       "Set SPH_KECCAK_UNROLL for Xn derived algorithms (Default: 0)"),
-  OPT_WITH_ARG("--lookup-gap",
+  OPT_WITH_ARG("--kernelfile",
+			set_default_kernelfile, NULL, NULL,
+			"Set the algorithm kernel source file (without file extension)."),
+	OPT_WITH_ARG("--lookup-gap",
       set_default_lookup_gap, NULL, NULL,
       "Set GPU lookup gap for scrypt mining, comma separated"),
   OPT_WITHOUT_ARG("--luffa-parallel",
@@ -1467,10 +1485,6 @@ struct opt_table opt_config_table[] = {
       "Intensity of GPU scanning (d or " MIN_INTENSITY_STR
       " -> " MAX_INTENSITY_STR
       ",default: d to maintain desktop interactivity), overridden by --xintensity or --rawintensity."),
-  OPT_WITH_ARG("--xintensity|-X",
-      set_default_xintensity, NULL, NULL,
-      "Shader based intensity of GPU scanning (" MIN_XINTENSITY_STR " to "
-        MAX_XINTENSITY_STR "), overridden --xintensity|-X and --rawintensity."),
   OPT_WITH_ARG("--xintensity|-X",
       set_default_xintensity, NULL, NULL,
       "Shader based intensity of GPU scanning (" MIN_XINTENSITY_STR " to "
@@ -1550,7 +1564,10 @@ struct opt_table opt_config_table[] = {
   OPT_WITH_ARG("--pool-device",
       set_pool_devices, NULL, NULL,
       "Select devices to use with pool, one value, range and/or comma separated (e.g. 0-2,4) default: all"),
-  OPT_WITH_ARG("--pool-lookup-gap",
+  OPT_WITH_ARG("--pool-kernelfile",
+			set_pool_kernelfile, NULL, NULL,
+			"Set the pool's algorithm kernel source file (without file extension)."),
+	OPT_WITH_ARG("--pool-lookup-gap",
       set_pool_lookup_gap, NULL, NULL,
       "Set Pool GPU lookup gap for scrypt mining, comma separated"),
 #ifdef HAVE_ADL
@@ -1608,7 +1625,10 @@ struct opt_table opt_config_table[] = {
   OPT_WITH_ARG("--profile-device",
       set_profile_devices, NULL, NULL,
       "Select devices to use with profile, one value, range and/or comma separated (e.g. 0-2,4) default: all"),
-  OPT_WITH_ARG("--profile-lookup-gap",
+  OPT_WITH_ARG("--profile-kernelfile",
+			set_profile_kernelfile, NULL, NULL,
+			"Set the profile's algorithm kernel source file (without file extension)."),
+	OPT_WITH_ARG("--profile-lookup-gap",
       set_profile_lookup_gap, NULL, NULL,
       "Set Profile GPU lookup gap for scrypt mining, comma separated"),
 #ifdef HAVE_ADL
@@ -2041,11 +2061,25 @@ static void update_gbt(struct pool *pool)
 /* Return the work coin/network difficulty */
 static double get_work_blockdiff(const struct work *work)
 {
-  uint8_t pow = work->data[72];
-  int powdiff = (8 * (0x1d - 3)) - (8 * (pow - 3));
-  uint32_t diff32 = be32toh(*((uint32_t *)(work->data + 72))) & 0x00FFFFFF;
-  double numerator = work->pool->algorithm.diff_numerator << powdiff;
-  return numerator / (double)diff32;
+  uint64_t diff64;
+  double numerator;
+
+  // Neoscrypt has the data reversed
+  if (!safe_cmp(work->pool->algorithm.name, "neoscrypt")) {
+    diff64 = bswap_64(((uint64_t)(be32toh(*((uint32_t *)(work->data + 72))) & 0xFFFFFF00)) << 8);
+    numerator = (double)work->pool->algorithm.diff_numerator;
+  } else {
+    uint8_t pow = work->data[72];
+    int powdiff = (8 * (0x1d - 3)) - (8 * (pow - 3));;
+    diff64 = be32toh(*((uint32_t *)(work->data + 72))) & 0x0000000000FFFFFF;
+    numerator = work->pool->algorithm.diff_numerator << powdiff;
+  }
+
+  if (unlikely(!diff64)) {
+    diff64 = 1;
+  }
+
+  return numerator / (double)diff64;
 }
 
 static void gen_gbt_work(struct pool *pool, struct work *work)
@@ -2095,7 +2129,11 @@ static void gen_gbt_work(struct pool *pool, struct work *work)
     free(header);
   }
 
-  calc_midstate(work);
+  // Neoscrypt doesn't calc_midstate()
+  if (!safe_cmp(pool->algorithm.name, "neoscrypt")) {
+    calc_midstate(work);
+  }
+
   local_work++;
   work->pool = pool;
   work->gbt = true;
@@ -2212,11 +2250,14 @@ static bool getwork_decode(json_t *res_val, struct work *work)
     return false;
   }
 
-  if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
-    // Calculate it ourselves
-    if (opt_morenotices)
-      applog(LOG_DEBUG, "%s: Calculating midstate locally", isnull(get_pool_name(work->pool), ""));
-    calc_midstate(work);
+  // Neoscrypt doesn't calc midstate
+  if (!safe_cmp(work->pool->algorithm.name, "neoscrypt")) {
+    if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
+      // Calculate it ourselves
+      if (opt_morenotices)
+        applog(LOG_DEBUG, "%s: Calculating midstate locally", isnull(get_pool_name(work->pool), ""));
+      calc_midstate(work);
+    }
   }
 
   if (unlikely(!jobj_binary(res_val, "target", work->target, sizeof(work->target), true))) {
@@ -2909,10 +2950,12 @@ static void show_hash(struct work *work, char *hashshow)
      work->block? " BLOCK!" : "");
   } else {
     swab256(rhash, work->hash);
-    for (ofs = 0; ofs <= 28; ofs ++) {
-      if (rhash[ofs])
+    for (ofs = 0; ofs <= 28; ++ofs) {
+      if (rhash[ofs]) {
         break;
+			}
     }
+
     hash32 = (uint32_t *)(rhash + ofs);
     h32 = be32toh(*hash32);
 
@@ -2960,8 +3003,8 @@ static bool submit_upstream_work(struct work *work, CURL *curl, char *curl_err_s
 
   endian_flip128(work->data, work->data);
 
-  /* build hex string */
-  hexstr = bin2hex(work->data, sizeof(work->data));
+  /* build hex string - Make sure to restrict to 80 bytes for Neoscrypt */
+  hexstr = bin2hex(work->data, ((!safe_cmp(work->pool->algorithm.name, "neoscrypt"))?80:sizeof(work->data)));
 
   /* build JSON-RPC request */
   if (work->gbt) {
@@ -3321,18 +3364,27 @@ static void calc_diff(struct work *work, double known)
   struct sgminer_pool_stats *pool_stats = &(work->pool->sgminer_pool_stats);
   double difficulty;
 
-  if (known)
+  if (known) {
     work->work_difficulty = known;
-  else {
+  } else {
     double d64, dcut64;
 
     d64 = work->pool->algorithm.diff_multiplier2 * truediffone;
 
-    dcut64 = le256todouble(work->target);
+    applog(LOG_DEBUG, "calc_diff() algorithm = %s", work->pool->algorithm.name);
+
+    // Neoscrypt
+    if (!safe_cmp(work->pool->algorithm.name, "neoscrypt")) {
+      dcut64 = (double)*((uint64_t *)(work->target + 22));
+    } else {
+      dcut64 = le256todouble(work->target);
+    }
+
     if (unlikely(!dcut64))
       dcut64 = 1;
     work->work_difficulty = d64 / dcut64;
   }
+
   difficulty = work->work_difficulty;
 
   pool_stats->last_diff = difficulty;
@@ -5489,18 +5541,26 @@ static void *stratum_sthread(void *userdata)
     sshare->sshare_time = time(NULL);
     /* This work item is freed in parse_stratum_response */
     sshare->work = work;
-    nonce = *((uint32_t *)(work->data + 76));
+
+    applog(LOG_DEBUG, "stratum_sthread() algorithm = %s", pool->algorithm.name);
+
+    // Neoscrypt is little endian
+    if (!safe_cmp(pool->algorithm.name, "neoscrypt")) {
+      nonce = htobe32(*((uint32_t *)(work->data + 76)));
+//      *((uint32_t *)nonce2) = htole32(work->nonce2);
+    } else {
+      nonce = *((uint32_t *)(work->data + 76));
+    }
     __bin2hex(noncehex, (const unsigned char *)&nonce, 4);
+
+    *((uint64_t *)nonce2) = htole64(work->nonce2);
+    __bin2hex(nonce2hex, nonce2, work->nonce2_len);
     memset(s, 0, 1024);
 
     mutex_lock(&sshare_lock);
     /* Give the stratum share a unique id */
     sshare->id = swork_id++;
     mutex_unlock(&sshare_lock);
-
-    nonce2_64 = (uint64_t *)nonce2;
-    *nonce2_64 = htole64(work->nonce2);
-    __bin2hex(nonce2hex, nonce2, work->nonce2_len);
 
     snprintf(s, sizeof(s),
       "{\"params\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"], \"id\": %d, \"method\": \"mining.submit\"}",
@@ -5910,6 +5970,49 @@ void set_target(unsigned char *dest_target, double diff, double diff_multiplier2
   memcpy(dest_target, target, 32);
 }
 
+/*****************************************************
+ * Special set_target() function for Neoscrypt
+ ****************************************************/
+void set_target_neoscrypt(unsigned char *target, double diff)
+{
+	uint64_t m;
+	int k;
+
+	diff /=	65536.0;
+	for (k = 6; k > 0 && diff > 1.0; --k) {
+		diff /= 4294967296.0;
+  }
+
+	m = 4294901760.0 / diff;
+
+	if (m == 0 && k == 6) {
+		memset(target, 0xff, 32);
+	} else {
+		memset(target, 0, 32);
+		((uint32_t *)target)[k] = (uint32_t)m;
+		((uint32_t *)target)[k + 1] = (uint32_t)(m >> 32);
+	}
+
+	if (opt_debug) {
+		/* The target is computed in this systems endianess and stored
+		 * in its endianess on a uint32-level. But because the target are
+		 * eight uint32s, they are stored in mixed mode, i.e., each uint32
+		 * is stored in the local endianess, but the least significant bit
+		 * is stored in target[0] bit 0.
+		 *
+		 * To print this large number in a native human readable form the
+		 * order of the array entries is swapped, i.e., target[7] <-> target[0]
+		 * and each array entry is byte swapped to have the least significant
+		 * bit to the right. */
+		uint32_t swaped[8];
+		swab256(swaped, target);
+		char *htarget = bin2hex((unsigned char *)swaped, 32);
+
+		applog(LOG_DEBUG, "Generated neoscrypt target 0x%s", htarget);
+		free(htarget);
+	}
+}
+
 /* Generates stratum based work based on the most recent notify information
  * from the pool. This will keep generating work while a pool is down so we use
  * other means to detect when the pool has died in stratum_thread */
@@ -5918,7 +6021,7 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
   unsigned char merkle_root[32], merkle_sha[64];
   uint32_t *data32, *swap32;
   uint64_t nonce2le;
-  int i;
+  int i, j;
 
   cg_wlock(&pool->data_lock);
 
@@ -5940,13 +6043,45 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
     gen_hash(merkle_sha, 64, merkle_root);
     memcpy(merkle_sha, merkle_root, 32);
   }
-  data32 = (uint32_t *)merkle_sha;
-  swap32 = (uint32_t *)merkle_root;
-  flip32(swap32, data32);
+  applog(LOG_DEBUG, "gen_stratum_work() - algorithm = %s", pool->algorithm.name);
 
-  /* Copy the data template from header_bin */
-  memcpy(work->data, pool->header_bin, 128);
-  memcpy(work->data + pool->merkle_offset, merkle_root, 32);
+  // Different for Neoscrypt because of Little Endian
+  if (!safe_cmp(pool->algorithm.name, "neoscrypt")) {
+    /* Incoming data is in little endian. */
+		memcpy(merkle_root, merkle_sha, 32);
+
+    uint32_t temp = pool->merkle_offset/ sizeof(uint32_t), i;
+		/* Put version (4 byte) + prev_hash (4 byte* 8) but big endian encoded
+		 * into work. */
+		for (i=0; i < temp; ++i) {
+			((uint32_t *)work->data)[i] = be32toh(((uint32_t *)pool->header_bin)[i]);
+    }
+
+		/* Now add the merkle_root (4 byte* 8), but it is encoded in little endian. */
+		temp += 8;
+
+		for (j=0; i < temp; ++i, ++j) {
+			((uint32_t *)work->data)[i] = le32toh(((uint32_t *)merkle_root)[j]);
+    }
+
+		/* Add the time encoded in big endianess. */
+		hex2bin((unsigned char *)&temp, pool->swork.ntime, 4);
+
+    /* Add the nbits (big endianess). */
+		((uint32_t *)work->data)[17]= be32toh(temp);
+		hex2bin((unsigned char *)&temp, pool->swork.nbit, 4);
+		((uint32_t *)work->data)[18]= be32toh(temp);
+		((uint32_t *)work->data)[20]= 0x80000000;
+		((uint32_t *)work->data)[31]= 0x00000280;
+  } else {
+    data32 = (uint32_t *)merkle_sha;
+    swap32 = (uint32_t *)merkle_root;
+    flip32(swap32, data32);
+
+    /* Copy the data template from header_bin */
+    memcpy(work->data, pool->header_bin, 128);
+    memcpy(work->data + pool->merkle_offset, merkle_root, 32);
+  }
 
   /* Store the stratum work diff to check it still matches the pool's
    * stratum diff when submitting shares */
@@ -5971,8 +6106,13 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
     free(merkle_hash);
   }
 
-  calc_midstate(work);
-  set_target(work->target, work->sdiff, pool->algorithm.diff_multiplier2);
+  // For Neoscrypt use set_target_neoscrypt() function
+  if (!safe_cmp(pool->algorithm.name, "neoscrypt")) {
+    set_target_neoscrypt(work->target, work->sdiff);
+  } else {
+    calc_midstate(work);
+    set_target(work->target, work->sdiff, pool->algorithm.diff_multiplier2);
+  }
 
   local_work++;
   work->pool = pool;
@@ -6149,6 +6289,8 @@ static unsigned long compare_pool_settings(struct pool *pool1, struct pool *pool
   unsigned int options = 0;
   const char *opt1, *opt2;
 
+  applog(LOG_DEBUG, "compare_pool_settings()");
+
   if(!pool1 || !pool2)
     return 0;
 
@@ -6305,6 +6447,8 @@ static void mutex_unlock_cleanup_handler(void *mutex)
 static void get_work_prepare_thread(struct thr_info *mythr, struct work *work)
 {
   int i;
+
+  applog(LOG_DEBUG, "get_work_prepare_thread");
 
   //if switcher is disabled
   if(opt_switchmode == SWITCH_OFF)
@@ -6633,6 +6777,7 @@ struct work *get_work(struct thr_info *thr, const int thr_id)
     }
   }
 
+  applog(LOG_DEBUG, "preparing thread...");
   get_work_prepare_thread(thr, work);
 
   diff_t = time(NULL) - diff_t;
@@ -6725,7 +6870,15 @@ bool test_nonce(struct work *work, uint32_t nonce)
   uint32_t diff1targ;
 
   rebuild_nonce(work, nonce);
-  diff1targ = work->pool->algorithm.diff1targ;
+
+  applog(LOG_DEBUG, "test_nonce() algorithm = %s", work->pool->algorithm.name);
+
+  // for Neoscrypt, the diff1targe value is in work->target
+  if ((work->pool->algorithm.name, "neoscrypt")) {
+    diff1targ = ((uint32_t *)work->target)[7];
+  } else {
+    diff1targ = work->pool->algorithm.diff1targ;
+  }
 
   return (le32toh(*hash_32) <= diff1targ);
 }
@@ -8262,6 +8415,9 @@ int main(int argc, char *argv[])
   if (unlikely(pthread_mutex_init(&lockstat_lock, NULL)))
     quithere(1, "Failed to pthread_mutex_init lockstat_lock errno=%d", errno);
 #endif
+
+  // initialize default profile (globals) before reading config options
+  init_default_profile();
 
   initial_args = (const char **)malloc(sizeof(char *)* (argc + 1));
   for  (i = 0; i < argc; i++)
