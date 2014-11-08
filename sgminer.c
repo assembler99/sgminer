@@ -2130,7 +2130,7 @@ static void gen_gbt_work(struct pool *pool, struct work *work)
   }
 
   // Neoscrypt doesn't calc_midstate()
-  if (!safe_cmp(pool->algorithm.name, "neoscrypt")) {
+  if (safe_cmp(pool->algorithm.name, "neoscrypt")) {
     calc_midstate(work);
   }
 
@@ -2251,7 +2251,7 @@ static bool getwork_decode(json_t *res_val, struct work *work)
   }
 
   // Neoscrypt doesn't calc midstate
-  if (!safe_cmp(work->pool->algorithm.name, "neoscrypt")) {
+  if (safe_cmp(work->pool->algorithm.name, "neoscrypt")) {
     if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
       // Calculate it ourselves
       if (opt_morenotices)
