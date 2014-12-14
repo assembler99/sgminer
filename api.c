@@ -2333,7 +2333,7 @@ static void gpuintensity(struct io_data *io_data, __maybe_unused SOCKETTYPE c, c
 
     gpus[id].dynamic = false;
     gpus[id].intensity = intensity;
-		gpus[id].xintensity = 0;
+    gpus[id].xintensity = 0;
     gpus[id].rawintensity = 0;
     sprintf(intensitystr, "%d", intensity);
   }

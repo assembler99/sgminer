@@ -42,7 +42,7 @@ event_t *events = NULL, *last_event = NULL;
  **************************************************/
 static void *cmd_thread(void *cmdp)
 {
-	const char *cmd = cmdp;
+	const char *cmd = (const char*)cmdp;
 
 	applog(LOG_DEBUG, "Executing command: %s", cmd);
 	system(cmd);

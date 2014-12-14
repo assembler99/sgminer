@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
@@ -47,9 +47,6 @@
     <ClCompile Include="..\logging.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\ocl.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\sgminer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -69,9 +66,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\pool.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\algorithm.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\sph\aes_helper.c">
@@ -128,12 +122,6 @@
     <ClCompile Include="..\sph\skein.c">
       <Filter>Source Files\sph</Filter>
     </ClCompile>
-    <ClCompile Include="..\sph\whirlpool.c">
-      <Filter>Source Files\sph</Filter>
-    </ClCompile>
-    <ClCompile Include="..\sph\shabal.c">
-      <Filter>Source Files\sph</Filter>
-    </ClCompile>
     <ClCompile Include="..\ocl\binary_kernel.c">
       <Filter>Source Files\ocl</Filter>
     </ClCompile>
@@ -176,9 +164,6 @@
     <ClCompile Include="..\algorithm\scrypt.c">
       <Filter>Source Files\algorithm</Filter>
     </ClCompile>
-		<ClCompile Include="..\algorithm\neoscrypt.c">
-      <Filter>Source Files\algorithm</Filter>
-    </ClCompile>
     <ClCompile Include="..\algorithm\sifcoin.c">
       <Filter>Source Files\algorithm</Filter>
     </ClCompile>
@@ -186,9 +171,6 @@
       <Filter>Source Files\algorithm</Filter>
     </ClCompile>
     <ClCompile Include="..\config_parser.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\events.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\algorithm\talkcoin.c">
@@ -205,6 +187,24 @@
     </ClCompile>
     <ClCompile Include="..\algorithm\whirlcoin.c">
       <Filter>Source Files\algorithm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sph\shabal.c">
+      <Filter>Source Files\sph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sph\whirlpool.c">
+      <Filter>Source Files\sph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ocl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\algorithm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\algorithm\neoscrypt.c">
+      <Filter>Source Files\algorithm</Filter>
+    </ClCompile>
+    <ClCompile Include="..\events.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -310,12 +310,6 @@
     <ClInclude Include="..\sph\sph_blake.h">
       <Filter>Header Files\sph</Filter>
     </ClInclude>
-    <ClInclude Include="..\sph\sph_whirlpool.h">
-      <Filter>Header Files\sph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\sph\sph_shabal.h">
-      <Filter>Header Files\sph</Filter>
-    </ClInclude>
     <ClInclude Include="..\ocl\binary_kernel.h">
       <Filter>Header Files\ocl</Filter>
     </ClInclude>
@@ -358,9 +352,6 @@
     <ClInclude Include="..\algorithm\scrypt.h">
       <Filter>Header Files\algorithm</Filter>
     </ClInclude>
-		<ClInclude Include="..\algorithm\neoscrypt.h">
-      <Filter>Header Files\algorithm</Filter>
-    </ClInclude>
     <ClInclude Include="..\algorithm\sifcoin.h">
       <Filter>Header Files\algorithm</Filter>
     </ClInclude>
@@ -371,9 +362,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\config_parser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\events.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\algorithm\talkcoin.h">
@@ -390,6 +378,18 @@
     </ClInclude>
     <ClInclude Include="..\algorithm\whirlcoin.h">
       <Filter>Header Files\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sph\sph_whirlpool.h">
+      <Filter>Header Files\sph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sph\sph_shabal.h">
+      <Filter>Header Files\sph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\algorithm\neoscrypt.h">
+      <Filter>Header Files\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\events.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

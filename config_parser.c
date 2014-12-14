@@ -154,7 +154,7 @@ static struct profile *get_profile(char *name)
   for (i=0;i<total_profiles;++i) {
     if (!safe_cmp(profiles[i]->name, name)) {
       return profiles[i];
-		}
+    }
   }
 
   return NULL;
@@ -717,17 +717,20 @@ char *parse_config(json_t *val, const char *key, const char *parentkey, bool fil
       if((opt = opt_find(opt_config_table, optname)) != NULL)
       {
         //strings
-        if ((opt->type & OPT_HASARG) && json_is_string(val))
+        if ((opt->type & OPT_HASARG) && json_is_string(val)) {
           err = opt->cb_arg(json_string_value(val), opt->u.arg);
+        }
         //boolean values
-        else if ((opt->type & OPT_NOARG) && json_is_true(val))
+        else if ((opt->type & OPT_NOARG) && json_is_true(val)) {
           err = opt->cb(opt->u.arg);
-        else
+        }
+        else {
           err = "Invalid value";
+        }
       }
-      else
+      else {
         err = "Invalid option";
-
+      }
       break;
   }
 
@@ -1069,39 +1072,76 @@ void apply_pool_profile(struct pool *pool)
   }
   applog(LOG_DEBUG, "Pool %i lookup gap set to \"%s\"", pool->pool_no, pool->lookup_gap);
 
-  if(pool_cmp(pool->intensity, default_profile.intensity))
-  {
-    if(!empty_string(profile->intensity))
-        pool->intensity = profile->intensity;
-    else
-        pool->intensity = default_profile.intensity;
-  }
-  applog(LOG_DEBUG, "Pool %i Intensity set to \"%s\"", pool->pool_no, pool->intensity);
+  int int_type = 0;
 
-  if(pool_cmp(pool->xintensity, default_profile.xintensity))
-  {
-    if(!empty_string(profile->xintensity))
-        pool->xintensity = profile->xintensity;
-    else
-        pool->xintensity = default_profile.xintensity;
+  // FIXME: ifs from hell...
+  // First look for an existing intensity on pool
+  if (!empty_string(pool->rawintensity)) {
+    int_type = 2;
   }
-  applog(LOG_DEBUG, "Pool %i XIntensity set to \"%s\"", pool->pool_no, pool->xintensity);
-
-  if(pool_cmp(pool->rawintensity, default_profile.rawintensity))
-  {
-    if(!empty_string(profile->rawintensity))
-        pool->rawintensity = profile->rawintensity;
-    else
+  else if (!empty_string(pool->xintensity)) {
+    int_type = 1;
+  }
+  else if (!empty_string(pool->intensity)) {
+    int_type = 0;
+  }
+  else {
+    //no intensity found on pool... check if the profile has one and use it...
+    if (!empty_string(profile->rawintensity)) {
+      int_type = 2;
+      pool->rawintensity = profile->rawintensity;
+    }
+    else if (!empty_string(profile->xintensity)) {
+      int_type = 1;
+      pool->xintensity = profile->xintensity;
+    }
+    else if (!empty_string(profile->intensity)) {
+      int_type = 0;
+      pool->intensity = profile->intensity;
+    }
+    else {
+      //nothing in profile... check default profile/globals
+      if (!empty_string(default_profile.rawintensity)) {
+        int_type = 2;
         pool->rawintensity = default_profile.rawintensity;
+      }
+      else if (!empty_string(default_profile.xintensity)) {
+        int_type = 1;
+        pool->xintensity = default_profile.xintensity;
+      }
+      else if (!empty_string(default_profile.intensity)) {
+        int_type = 0;
+        pool->intensity = default_profile.intensity;
+      }
+      else {
+        //nothing anywhere? default to sgminer default of 8
+        int_type = 0;
+        pool->intensity = strdup("8");
+      }
+    }
   }
-  applog(LOG_DEBUG, "Pool %i Raw Intensity set to \"%s\"", pool->pool_no, pool->rawintensity);
+
+  switch(int_type) {
+    case 2:
+      applog(LOG_DEBUG, "Pool %d Raw Intensity set to \"%s\"", pool->pool_no, pool->rawintensity);
+      break;
+
+    case 1:
+      applog(LOG_DEBUG, "Pool %d XIntensity set to \"%s\"", pool->pool_no, pool->xintensity);
+      break;
+
+    default:
+      applog(LOG_DEBUG, "Pool %d Intensity set to \"%s\"", pool->pool_no, pool->intensity);
+      break;
+  }
 
   if(pool_cmp(pool->thread_concurrency, default_profile.thread_concurrency))
   {
-    if(!empty_string(profile->thread_concurrency))
-        pool->thread_concurrency = profile->thread_concurrency;
-    else
-        pool->thread_concurrency = default_profile.thread_concurrency;
+    /* allow empty string TC
+      if(!empty_string(profile->thread_concurrency))*/
+      pool->thread_concurrency = profile->thread_concurrency;
+/*    else
+        pool->thread_concurrency = default_profile.thread_concurrency;*/
   }
   applog(LOG_DEBUG, "Pool %i Thread Concurrency set to \"%s\"", pool->pool_no, pool->thread_concurrency);
 
@@ -1350,7 +1390,7 @@ static json_t *build_pool_json()
     // rawintensity
     if (!empty_string(pool->rawintensity)) {
       if (!build_pool_json_add(obj, "rawintensity", pool->rawintensity, profile->rawintensity, default_profile.rawintensity, pool->pool_no)) {
-         return NULL;
+        return NULL;
       }
     }
     // xintensity
@@ -1360,9 +1400,9 @@ static json_t *build_pool_json()
       }
     }
     // intensity
-   else if (!empty_string(pool->intensity)) {
+    else if (!empty_string(pool->intensity)) {
       if (!build_pool_json_add(obj, "intensity", pool->intensity, profile->intensity, default_profile.intensity, pool->pool_no)) {
-         return NULL;
+        return NULL;
       }
     }
 
@@ -1425,12 +1465,12 @@ static json_t *build_profile_json_add(json_t *object, const char *key, const cha
   // no value, return...
   if (empty_string(val)) {
     return object;
-	}
+  }
 
   //if the value is the same as default profile and, the current profile is not default profile, return...
   if ((safe_cmp(str_compare, val) == 0) && isdefault == false) {
     return object;
-	}
+  }
 
   json_profile_add(object, key, json_string(val), parentkey, id);
 
@@ -1466,19 +1506,19 @@ static json_t *build_profile_settings_json(json_t *object, struct profile *profi
   // rawintensity
   if (!empty_string(profile->rawintensity) || (isdefault && !empty_string(default_profile.rawintensity))) {
     if(!build_profile_json_add(object, "rawintensity", profile->rawintensity, default_profile.rawintensity, isdefault, parentkey, profile->profile_no)) {
-       return NULL;
+      return NULL;
     }
   }
   // xintensity
   else if (!empty_string(profile->xintensity) || (isdefault && !empty_string(default_profile.xintensity))) {
     if(!build_profile_json_add(object, "xintensity", profile->xintensity, default_profile.xintensity, isdefault, parentkey, profile->profile_no)) {
-       return NULL;
+      return NULL;
     }
   }
   // intensity
   else if (!empty_string(profile->intensity) || (isdefault && !empty_string(default_profile.intensity))) {
     if(!build_profile_json_add(object, "intensity", profile->intensity, default_profile.intensity, isdefault, parentkey, profile->profile_no)) {
-       return NULL;
+      return NULL;
     }
   }
 
@@ -2150,6 +2190,7 @@ void api_pool_profile(struct io_data *io_data, __maybe_unused SOCKETTYPE c, char
   message(io_data, MSG_CHPOOLPR, pool->pool_no, profile->name, isjson);
 }
 
+
 void update_config_intensity(struct profile *profile)
 {
   int i;
@@ -2280,3 +2321,4 @@ void update_config_rawintensity(struct profile *profile)
     default_profile.rawintensity = strdup((const char *)buf);
   }
 }
+

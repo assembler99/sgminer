@@ -51,7 +51,8 @@ const char *algorithm_type_str[] = {
   "Fugue256",
   "NIST",
   "Fresh",
-  "Whirlcoin"
+  "Whirlcoin",
+  "Neoscrypt"
 };
 
 void sha256(const unsigned char *message, unsigned int len, unsigned char *digest)
@@ -98,11 +99,11 @@ static void append_scrypt_compiler_options(struct _build_kernel_data *data, stru
 static void append_neoscrypt_compiler_options(struct _build_kernel_data *data, struct cgpu_info *cgpu, struct _algorithm_t *algorithm)
 {
   char buf[255];
-  sprintf(buf, " -D MAX_GLOBAL_THREADS=%u",
-         (unsigned int)cgpu->thread_concurrency);
+  sprintf(buf, " %s-D MAX_GLOBAL_THREADS=%lu ",
+         ((cgpu->lookup_gap > 0)?" -D LOOKUP_GAP=2 ":""), (unsigned long)cgpu->thread_concurrency);
   strcat(data->compiler_options, buf);
 
-  sprintf(buf, "tc%u", (unsigned int)cgpu->thread_concurrency);
+  sprintf(buf, "%stc%lu", ((cgpu->lookup_gap > 0)?"lg":""), (unsigned long)cgpu->thread_concurrency);
   strcat(data->binary_filename, buf);
 }
 
@@ -156,25 +157,25 @@ static cl_int queue_scrypt_kernel(struct __clState *clState, struct _dev_blk_ctx
 
 static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_unused cl_uint threads)
 {
-	cl_kernel *kernel = &clState->kernel;
-	unsigned int num = 0;
-	cl_uint le_target;
-	cl_int status = 0;
+  cl_kernel *kernel = &clState->kernel;
+  unsigned int num = 0;
+  cl_uint le_target;
+  cl_int status = 0;
 
-	/* This looks like a unnecessary double cast, but to make sure, that
-	 * the target's most significant entry is addressed as a 32-bit value
-	 * and not accidently by something else the double cast seems wise.
-	 * The compiler will get rid of it anyway. */
-	le_target = (cl_uint)le32toh(((uint32_t *)blk->work->/*device_*/target)[7]);
-	memcpy(clState->cldata, blk->work->data, 80);
-	status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL,NULL);
+  /* This looks like a unnecessary double cast, but to make sure, that
+   * the target's most significant entry is adressed as a 32-bit value
+   * and not accidently by something else the double cast seems wise.
+   * The compiler will get rid of it anyway. */
+  le_target = (cl_uint)le32toh(((uint32_t *)blk->work->/*device_*/target)[7]);
+  memcpy(clState->cldata, blk->work->data, 80);
+  status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL,NULL);
 
-	CL_SET_ARG(clState->CLbuffer0);
-	CL_SET_ARG(clState->outputBuffer);
-	CL_SET_ARG(clState->padbuffer8);
-	CL_SET_ARG(le_target);
+  CL_SET_ARG(clState->CLbuffer0);
+  CL_SET_ARG(clState->outputBuffer);
+  CL_SET_ARG(clState->padbuffer8);
+  CL_SET_ARG(le_target);
 
-	return status;
+  return status;
 }
 
 static cl_int queue_maxcoin_kernel(struct __clState *clState, struct _dev_blk_ctx *blk, __maybe_unused cl_uint threads)
@@ -657,10 +658,10 @@ static algorithm_settings_t algos[] = {
   A_SCRYPT( "ckolivas" ),
   A_SCRYPT( "alexkarnew" ),
   A_SCRYPT( "alexkarnold" ),
-  A_SCRYPT( "arebyp" ),
   A_SCRYPT( "bufius" ),
   A_SCRYPT( "psw" ),
   A_SCRYPT( "zuikkis" ),
+  A_SCRYPT( "arebyp" ),
 #undef A_SCRYPT
 
 #define A_NEOSCRYPT(a) \
@@ -679,7 +680,7 @@ static algorithm_settings_t algos[] = {
 
   // kernels starting from this will have difficulty calculated by using bitcoin algorithm
 #define A_DARK(a, b) \
-    { a, ALGO_X11, "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, b, queue_sph_kernel, gen_hash, NULL}
+    { a, ALGO_X11, "", 1, 1, 1, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 0, 0, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, b, queue_sph_kernel, gen_hash, append_x11_compiler_options}
   A_DARK( "darkcoin",           darkcoin_regenhash),
   A_DARK( "inkcoin",            inkcoin_regenhash),
   A_DARK( "myriadcoin-groestl", myriadcoin_groestl_regenhash),

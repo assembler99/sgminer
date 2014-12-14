@@ -49,8 +49,6 @@
 
 #define PATH_MAX MAX_PATH
 
-#define R_OK 0
-
 // Libraries to include
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "wsock32.lib")

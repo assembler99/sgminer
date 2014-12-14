@@ -38,10 +38,10 @@
 
 /* Move init out of loop, so init once externally, and then use one single memcpy with that bigger memory block */
 typedef struct {
-    sph_whirlpool1_context whirlpool1;
-    sph_whirlpool1_context whirlpool2;
-    sph_whirlpool1_context whirlpool3;
-    sph_whirlpool1_context whirlpool4;
+  sph_whirlpool1_context whirlpool1;
+  sph_whirlpool1_context whirlpool2;
+  sph_whirlpool1_context whirlpool3;
+  sph_whirlpool1_context whirlpool4;
 } Whash_context_holder;
 
 Whash_context_holder base_contexts;
@@ -72,24 +72,24 @@ be32enc_vect(uint32_t *dst, const uint32_t *src, uint32_t len)
 inline void whirlcoin_hash(void *state, const void *input)
 {
     init_whirlcoin_hash_contexts();
-    
+
     Whash_context_holder ctx;
-    uint32_t hashA[16], hashB[16];  
-    
+    uint32_t hashA[16], hashB[16];
+
     memcpy(&ctx, &base_contexts, sizeof(base_contexts));
 
     sph_whirlpool1 (&ctx.whirlpool1, input, 80);
-    sph_whirlpool1_close (&ctx.whirlpool1, hashA);      
-    
+    sph_whirlpool1_close (&ctx.whirlpool1, hashA);
+
 	sph_whirlpool1(&ctx.whirlpool2, hashA, 64);
     sph_whirlpool1_close(&ctx.whirlpool2, hashB);
 
     sph_whirlpool1(&ctx.whirlpool3, hashB, 64);
     sph_whirlpool1_close(&ctx.whirlpool3, hashA);
-	
+
 	sph_whirlpool1(&ctx.whirlpool4, hashA, 64);
     sph_whirlpool1_close(&ctx.whirlpool4, hashB);
-	
+
     memcpy(state, hashB, 32);
 }
 
@@ -169,4 +169,3 @@ bool scanhash_whirlcoin(struct thr_info *thr, const unsigned char __maybe_unused
 
 	return ret;
 }
-
