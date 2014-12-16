@@ -31,7 +31,7 @@
 #include "algorithm/fresh.h"
 #include "algorithm/whirlcoin.h"
 #include "algorithm/neoscrypt.h"
-#include "algorithm/Lyra2RE.h"
+#include "algorithm/lyra2re.h"
 
 #include "compat.h"
 
@@ -752,7 +752,7 @@ static algorithm_settings_t algos[] = {
 
   { "fresh", ALGO_FRESH, "", 1, 256, 256, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 4, 4 * 16 * 4194304, 0, fresh_regenhash, queue_fresh_kernel, gen_hash, NULL},
 
-  { "Lyra2RE", ALGO_LYRA2RE, "", 1, 128, 128, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 4,2 * 8 * 4194304 , 0, lyra2re_regenhash, queue_lyra2RE_kernel, gen_hash, NULL},
+  { "lyra2re", ALGO_LYRA2RE, "", 1, 128, 128, 0, 0, 0xFF, 0xFFFFULL, 0x0000ffffUL, 4,2 * 8 * 4194304 , 0, lyra2re_regenhash, queue_lyra2RE_kernel, gen_hash, NULL},
 
   // kernels starting from this will have difficulty calculated by using fuguecoin algorithm
 #define A_FUGUE(a, b, c) \
@@ -835,6 +835,8 @@ static const char *lookup_algorithm_alias(const char *lookup_alias, uint8_t *nfa
   ALGO_ALIAS("nist5", "talkcoin-mod");
   ALGO_ALIAS("keccak", "maxcoin");
   ALGO_ALIAS("whirlpool", "whirlcoin");
+  ALGO_ALIAS("Lyra2RE", "lyra2re");
+  ALGO_ALIAS("lyra2", "lyra2re");
 
   #undef ALGO_ALIAS
   #undef ALGO_ALIAS_NF
