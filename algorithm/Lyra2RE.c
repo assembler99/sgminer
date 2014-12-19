@@ -36,7 +36,7 @@
 #include "sph/sph_groestl.h"
 #include "sph/sph_skein.h"
 #include "sph/sph_keccak.h" 
-#include "Lyra2.h"
+#include "lyra2.h"
 
 /*
  * Encode a length len/4 vector of (uint32_t) into a length len vector of
