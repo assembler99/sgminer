@@ -59,14 +59,14 @@ int LYRA2(void *K, uint64_t kLen, const void *pwd, uint64_t pwdlen, const void *
     //========== Initializing the Memory Matrix and pointers to it =============//
     //Tries to allocate enough space for the whole memory matrix
     i = (int64_t) ((int64_t) nRows * (int64_t) ROW_LEN_BYTES);
-    uint64_t *wholeMatrix = malloc(i);
+	uint64_t *wholeMatrix = (uint64_t*)malloc(i);
     if (wholeMatrix == NULL) {
       return -1;
     }
 	memset(wholeMatrix, 0, i);
 
     //Allocates pointers to each row of the matrix
-    uint64_t **memMatrix = malloc(nRows * sizeof (uint64_t*));
+	uint64_t **memMatrix = (uint64_t**)malloc(nRows * sizeof (uint64_t*));
     if (memMatrix == NULL) {
       return -1;
     }
@@ -118,7 +118,7 @@ int LYRA2(void *K, uint64_t kLen, const void *pwd, uint64_t pwdlen, const void *
 
     //======================= Initializing the Sponge State ====================//
     //Sponge state: 16 uint64_t, BLOCK_LEN_INT64 words of them for the bitrate (b) and the remainder for the capacity (c)
-    uint64_t *state = malloc(16 * sizeof (uint64_t));
+	uint64_t *state = (uint64_t*)malloc(16 * sizeof (uint64_t));
     if (state == NULL) {
       return -1;
     }
@@ -192,7 +192,7 @@ int LYRA2(void *K, uint64_t kLen, const void *pwd, uint64_t pwdlen, const void *
     absorbBlock(state, memMatrix[rowa]);
 
     //Squeezes the key
-    squeeze(state, K, kLen);
+    squeeze(state, (unsigned char*)K, kLen);
     //==========================================================================/
 
     //========================= Freeing the memory =============================//
